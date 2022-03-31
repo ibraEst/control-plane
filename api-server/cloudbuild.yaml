@@ -1,0 +1,15 @@
+steps:
+# Build the container image
+- name: 'gcr.io/cloud-builders/docker'
+  args: ['build', '-t', 'gcr.io/cagip-test-ibra-inno0-a6/control-plane', '.']
+# Push the container image to Container Registry
+- name: 'gcr.io/cloud-builders/docker'
+  args: ['push', 'gcr.io/cagip-test-ibra-inno0-a6/control-plane']
+# Deploy container image to Cloud Run
+- name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+  entrypoint: gcloud
+  args: ['run', 'deploy', 'cp-server', '--image', 'gcr.io/cagip-test-ibra-inno0-a6/control-plane', '--region', 'europe-west2', '--service-account','sac-dev-1@cagip-test-ibra-inno0-a6.iam.gserviceaccount.com']
+  env:
+  - 'PORT=10000'
+images:
+- gcr.io/cagip-test-ibra-inno0-a6/control-plane
