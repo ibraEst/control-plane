@@ -10,9 +10,8 @@ type GatewayServiceImpl struct {
 	list []Gateway
 }
 
-//initialize an empty store
-func NewGatewayService() *GatewayServiceImpl {
-	return &GatewayServiceImpl{[]Gateway{}}
+func NewGatewayService(list []Gateway) *GatewayServiceImpl {
+	return &GatewayServiceImpl{list: list}
 }
 
 func (im *GatewayServiceImpl) GetGatewayInfo(id string) (Gateway, error) {

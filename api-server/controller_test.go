@@ -10,21 +10,14 @@ import (
 	"net/http/httptest"
 	"reflect"
 	"testing"
-
-	"github.com/gin-gonic/gin"
 )
 
-//Mock object which meet the service interface requirements.
-type ServiceMock struct {
+//Mock object which meet the gateway service interface requirements.
+type MockGatewayService struct {
 	records []Gateway
 }
 
-type MockConfigService struct {
-	getConfigFunc func() ([]string, error)
-	//configurations []Configuration
-}
-
-func (s *ServiceMock) GetGatewayInfo(id string) (Gateway, error) {
+func (s *MockGatewayService) GetGatewayInfo(id string) (Gateway, error) {
 	var result Gateway
 	for _, gateway := range s.records {
 		if gateway.ID == id {
@@ -34,7 +27,7 @@ func (s *ServiceMock) GetGatewayInfo(id string) (Gateway, error) {
 	return result, errors.New("No gateway registred with id " + id)
 }
 
-func (s *ServiceMock) RegisterGateway(gtw Gateway) error {
+func (s *MockGatewayService) RegisterGateway(gtw Gateway) error {
 	found, _ := s.GetGatewayInfo(gtw.ID)
 	if (Gateway{} != found) { //replace with not nil func
 		return errors.New("Gateway already registred with id " + gtw.ID)
@@ -44,18 +37,28 @@ func (s *ServiceMock) RegisterGateway(gtw Gateway) error {
 	return nil
 }
 
-func (s *ServiceMock) GetGateways() []Gateway {
+func (s *MockGatewayService) GetGateways() []Gateway {
 	return s.records
 }
 
-func (s *MockConfigService) GetConfiguration() ([]string, error) {
+//Mock object which meet the configuration service interface requirements.
+type MockConfigService struct {
+	configurations map[string][]Configuration
+}
 
-	return s.getConfigFunc()
+func (s *MockConfigService) GetConfiguration(id string) ([]Configuration, error) {
+	v, found := s.configurations[id]
+
+	if !found {
+		return nil, errors.New("Gateway with id " + id + " not registered")
+	}
+
+	return v, nil
 }
 
 func TestListGateways(t *testing.T) {
 
-	want := []Gateway{
+	gateways := []Gateway{
 		{ID: "1",
 			Name: "gtw-1", Version: 2, Region: "euw1",
 		},
@@ -63,18 +66,13 @@ func TestListGateways(t *testing.T) {
 			Name: "gtw-2", Version: 3, Region: "euw1",
 		},
 	}
-	serviceMock := ServiceMock{
-		want,
+	mockGatewayService := MockGatewayService{
+		gateways,
 	}
 
-	server := NewControlPlane(&serviceMock)
-
-	// Switch to test mode so you don't get such noisy output
-	gin.SetMode(gin.TestMode)
-
-	// Setup router, and register routes
-	r := gin.Default()
-	r.GET("/v1/gateways", server.listGateways)
+	server := NewControlPlane(&mockGatewayService, nil)
+	port := 8080
+	s := SetupHttpServer(port, server)
 
 	// Create the mock request you'd like to test.
 	req, err := http.NewRequest(http.MethodGet, "/v1/gateways", nil)
@@ -86,19 +84,19 @@ func TestListGateways(t *testing.T) {
 	w := httptest.NewRecorder()
 
 	// Perform the request
-	r.ServeHTTP(w, req)
+	s.Handler.ServeHTTP(w, req)
 
 	// Check to see if the response was what you expected
 	assertStatus(t, w.Code, http.StatusOK)
 	got := getGatewaysFromResponse(t, w.Body)
 
-	assertGateways(t, got, want)
+	assertGateways(t, got, gateways)
 
 }
 
 func TestGETGateways(t *testing.T) {
 
-	want := []Gateway{
+	gateways := []Gateway{
 		{ID: "1",
 			Name: "gtw-1", Version: 2, Region: "euw1",
 		},
@@ -106,31 +104,28 @@ func TestGETGateways(t *testing.T) {
 			Name: "gtw-2", Version: 3, Region: "euw1",
 		},
 	}
-	serviceMock := ServiceMock{
-		want,
+	mockGatewayService := MockGatewayService{
+		gateways,
 	}
 
-	server := NewControlPlane(&serviceMock)
-
-	gin.SetMode(gin.TestMode)
-	r := gin.Default()
-	r.GET("/v1/gateways/:id", server.returnSingleGateway)
+	server := NewControlPlane(&mockGatewayService, nil)
+	port := 8080
+	s := SetupHttpServer(port, server)
 
 	t.Run("returns 1st gateway info", func(t *testing.T) {
 		//given
 		name := "1"
 		req, _ := http.NewRequest(http.MethodGet, fmt.Sprintf("/v1/gateways/%s", name), nil)
-
 		resp := httptest.NewRecorder()
 		//when
 
-		r.ServeHTTP(resp, req)
+		s.Handler.ServeHTTP(resp, req)
 		//then
 		assertStatus(t, resp.Code, http.StatusOK)
 
 		actual := getOneGatewayFromResponse(t, resp.Body)
 
-		assertGateway(t, actual, want[0])
+		assertGateway(t, actual, gateways[0])
 
 	})
 
@@ -139,7 +134,7 @@ func TestGETGateways(t *testing.T) {
 		req, _ := http.NewRequest(http.MethodGet, "/v1/gateways/unknown", nil)
 		resp := httptest.NewRecorder()
 		//when
-		r.ServeHTTP(resp, req)
+		s.Handler.ServeHTTP(resp, req)
 
 		//then
 		assertStatus(t, resp.Code, http.StatusNotFound)
@@ -153,15 +148,13 @@ func TestPostGateway(t *testing.T) {
 	gateways := []Gateway{{ID: "1",
 		Name: "gtw-1", Version: 2, Region: "euw1",
 	}}
-	serviceMock := ServiceMock{
+	mockGatewayService := MockGatewayService{
 		gateways,
 	}
 
-	server := NewControlPlane(&serviceMock)
-
-	gin.SetMode(gin.TestMode)
-	r := gin.Default()
-	r.POST("/v1/gateways", server.registerGateway)
+	server := NewControlPlane(&mockGatewayService, nil)
+	port := 8080
+	s := SetupHttpServer(port, server)
 
 	t.Run("returns status created when new gateway", func(t *testing.T) {
 		//given
@@ -171,7 +164,7 @@ func TestPostGateway(t *testing.T) {
 		request, _ := http.NewRequest(http.MethodPost, "/v1/gateways", bytes.NewBuffer(data))
 		response := httptest.NewRecorder()
 		//when
-		r.ServeHTTP(response, request)
+		s.Handler.ServeHTTP(response, request)
 
 		//then
 		assertStatus(t, response.Code, http.StatusCreated)
@@ -186,7 +179,7 @@ func TestPostGateway(t *testing.T) {
 		request, _ := http.NewRequest(http.MethodPost, "/v1/gateways", bytes.NewBuffer(data))
 		response := httptest.NewRecorder()
 		//when
-		r.ServeHTTP(response, request)
+		s.Handler.ServeHTTP(response, request)
 
 		//then
 		assertStatus(t, response.Code, http.StatusBadRequest)
@@ -197,51 +190,30 @@ func TestPostGateway(t *testing.T) {
 
 func TestGETConfiguration(t *testing.T) {
 
-	gin.SetMode(gin.TestMode)
-	r := gin.Default()
-	//register routes
+	store := make(map[string][]Configuration)
+	store["1"] = []Configuration{{
+		Direction:  "spokeToHub",
+		ServiceId:  "s1",
+		Ports:      nil,
+		ServiceVIP: "10.10.10.10",
+		ServiceIP:  "2.2.2.2",
+	}}
 
-	// Query string parameters are parsed using the existing underlying request object.
-	// The request responds to a url matching:  /welcome?firstname=Jane&lastname=Doe
-	r.GET("/welcome", func(c *gin.Context) {
-		firstname := c.DefaultQuery("firstname", "Guest")
-		lastname := c.Query("lastname") // shortcut for c.Request.URL.Query().Get("lastname")
-
-		c.String(http.StatusOK, "Hello %s %s", firstname, lastname)
-	})
-
-	t.Run("return status OK when valid request", func(t *testing.T) {
-		//given
-		req, _ := http.NewRequest(http.MethodGet, "/welcome?firstname=ben&lastname=ibra", nil)
-		resp := httptest.NewRecorder()
-
-		//when
-		r.ServeHTTP(resp, req)
-		//then
-		assertStatus(t, resp.Code, http.StatusOK)
-		got := resp.Body.String()
-		want := "Hello ben ibra"
-		if got != want {
-			t.Errorf("got %v but want %v", got, want)
-		}
-	})
-
+	port := 8080
 	t.Run("returns last configuration when identified gateway", func(t *testing.T) {
-		//given list of configuration
-		expected := []string{"config1"}
-		serviceMock := &MockConfigService{
-			getConfigFunc: func() ([]string, error) {
-				return expected, nil
-			},
+		//given list of configuration and valid gateway id
+		expected := store["1"]
+		mockConfigService := &MockConfigService{
+			store,
 		}
 
-		server := NewControlPlaneV2(serviceMock)
-		r.GET("/v1/gateways/configuration", server.GetConfiguration)
+		server := NewControlPlane(nil, mockConfigService)
+		s := SetupHttpServer(port, server)
 
 		//when pull config
-		req, _ := http.NewRequest(http.MethodGet, "/v1/gateways/configuration", nil)
+		req, _ := http.NewRequest(http.MethodGet, "/v1/gateways/1/configuration", nil)
 		resp := httptest.NewRecorder()
-		r.ServeHTTP(resp, req)
+		s.Handler.ServeHTTP(resp, req)
 
 		//then receive one config
 
@@ -251,6 +223,25 @@ func TestGETConfiguration(t *testing.T) {
 
 	})
 
+	t.Run("returns 500 internal server error if unknown gateway id", func(t *testing.T) {
+		//given list of configuration and valid gateway id
+		mockConfigService := &MockConfigService{
+			store,
+		}
+
+		server := NewControlPlane(nil, mockConfigService)
+		s := SetupHttpServer(port, server)
+
+		//when pull config
+		req, _ := http.NewRequest(http.MethodGet, "/v1/gateways/UNKNOWN/configuration", nil)
+		resp := httptest.NewRecorder()
+		s.Handler.ServeHTTP(resp, req)
+
+		//then receive one config
+
+		assertStatus(t, resp.Code, http.StatusInternalServerError)
+
+	})
 	/*	t.Run("returns 400 bad request if is not valid request JSON", func(t *testing.T) {
 			//given
 			name := "1"
@@ -268,22 +259,7 @@ func TestGETConfiguration(t *testing.T) {
 			assertGateway(t, actual, want[0])
 		}
 
-		t.Run("returns 500 internal server error if unknown gateway id", func(t *testing.T) {
-			//given
-			name := "1"
-			req, _ := http.NewRequest(http.MethodGet, fmt.Sprintf("/v1/gateways/%s", name), nil)
 
-			resp := httptest.NewRecorder()
-			//when
-
-			r.ServeHTTP(resp, req)
-			//then
-			assertStatus(t, resp.Code, http.StatusOK)
-
-			actual := getOneGatewayFromResponse(t, resp.Body)
-
-			assertGateway(t, actual, want[0])
-		}
 
 
 		t.Run("returns 500 internal server error if no configuration found for the gateway id", func(t *testing.T) {
@@ -321,7 +297,7 @@ func getGatewaysFromResponse(t testing.TB, body io.Reader) (result []Gateway) {
 	return
 }
 
-func getConfigurationFromResponse(t testing.TB, body io.Reader) (result []string) {
+func getConfigurationFromResponse(t testing.TB, body io.Reader) (result []Configuration) {
 	t.Helper()
 	err := json.NewDecoder(body).Decode(&result)
 
@@ -357,7 +333,7 @@ func assertGateway(t testing.TB, got, want Gateway) {
 	}
 }
 
-func assertConfigResponse(t testing.TB, got, want []string) {
+func assertConfigResponse(t testing.TB, got, want []Configuration) {
 	t.Helper()
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("got %v want %v", got, want)

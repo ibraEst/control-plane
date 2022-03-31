@@ -1,4 +1,4 @@
-module api-server
+module control-plane/api-server
 
 go 1.17
 

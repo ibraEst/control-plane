@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"log"
 	"net/http"
@@ -30,6 +29,11 @@ type ControlPlane struct {
 	configurationService ConfigurationService
 }
 
+func NewControlPlane(gatewayService GatewayService, configurationService ConfigurationService) *ControlPlane {
+
+	return &ControlPlane{gatewayService: gatewayService, configurationService: configurationService}
+}
+
 // GatewayService is an interface for gateways management.
 type GatewayService interface {
 	GetGatewayInfo(name string) (Gateway, error)
@@ -39,23 +43,7 @@ type GatewayService interface {
 
 // ConfigurationService is an interface for configuration management.
 type ConfigurationService interface {
-	GetConfiguration() ([]string, error)
-}
-
-func NewControlPlane(service GatewayService) *ControlPlane {
-
-	cp := new(ControlPlane)
-	cp.gatewayService = service
-
-	return cp
-}
-
-func NewControlPlaneV2(configService ConfigurationService) *ControlPlane {
-
-	cp := new(ControlPlane)
-	cp.configurationService = configService
-
-	return cp
+	GetConfiguration(id string) ([]Configuration, error)
 }
 
 func (cp *ControlPlane) registerGateway(c *gin.Context) {
@@ -103,18 +91,23 @@ func (cp *ControlPlane) returnSingleGateway(c *gin.Context) {
 func (cp *ControlPlane) GetConfiguration(c *gin.Context) {
 	fmt.Println("Endpoint Hit: get configuration")
 
-	result, _ := cp.configurationService.GetConfiguration()
-	//fmt.Println(result)
-	c.JSON(http.StatusOK, result)
+	id := c.Param("id")
+	result, err := cp.configurationService.GetConfiguration(id)
+	if err != nil {
+		c.Status(http.StatusInternalServerError)
+	} else {
+		c.JSON(http.StatusOK, result)
+	}
 }
 
-func (cp *ControlPlane) runHTTPServer(ctx context.Context, port int, controller *ControlPlane) error {
+func SetupHttpServer(port int, controller *ControlPlane) *http.Server {
 
 	router := gin.Default()
 
 	router.POST("/v1/gateways", controller.registerGateway)
 	router.GET("/v1/gateways", controller.listGateways)
 	router.GET("/v1/gateways/:id", controller.returnSingleGateway)
+	router.GET("/v1/gateways/:id/configuration", controller.GetConfiguration)
 
 	srv := &http.Server{
 		Addr:    fmt.Sprintf(":%d", port),
@@ -123,6 +116,6 @@ func (cp *ControlPlane) runHTTPServer(ctx context.Context, port int, controller 
 
 	log.Print("HTTP Server Listening on: ", port)
 
-	return srv.ListenAndServe()
+	return srv
 
 }
