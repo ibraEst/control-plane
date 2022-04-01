@@ -10,6 +10,7 @@ import (
 	"os"
 	"time"
 
+	//Package metadata provides access to Google Compute Engine (GCE) metadata and API service accounts.
 	"cloud.google.com/go/compute/metadata"
 )
 
@@ -20,7 +21,18 @@ type Gateway struct {
 	Region  string `json:"region"`
 }
 
-const endpointBasePath = "/v1/gateways"
+type Configuration struct {
+	Direction  string `json:"direction"`
+	ServiceId  string `json:"serviceId"`
+	Ports      []int  `json:"ports"`
+	ServiceVIP string `json:"vip"`
+	ServiceIP  string `json:"ip"`
+}
+
+const (
+	endpointBasePath  = "/v1/gateways"
+	metdataPathFormat = "/instance/service-accounts/default/identity?audience=%s"
+)
 
 func Default() *Gateway {
 	instanceID, _ := metadata.InstanceID()
@@ -41,23 +53,32 @@ func main() {
 	}
 
 	//get access token
-	tokenURL := fmt.Sprintf("/instance/service-accounts/default/identity?audience=%s", serviceURL)
+	/*tokenURL := fmt.Sprintf(metdataPathFormat, serviceURL)
 	idToken, err := metadata.Get(tokenURL)
 	if err != nil {
 		log.Fatalf("metadata.Get: failed to query id_token: %+v", err)
 		return
 	}
-
-	identity := Default()
+	*/
+	idToken := ""
+	//identity := Default()
+	identity := &Gateway{
+		ID:      "1",
+		Name:    "gtw-1",
+		Version: 2,
+		Region:  "euw1",
+	}
 
 	//register once when starting
 	registerGateway(serviceURL, identity, idToken)
 
 	//TODO (NCP-384) ping server to get last configuration
 	interval := 5 //to be configured
-	ticker := time.NewTicker(time.Duration(interval) * time.Minute)
+	ticker := time.NewTicker(time.Duration(interval) * time.Second)
 	for ; true; <-ticker.C {
-		log.Println("Calling server to get my configuration")
+		log.Println("Calling server to pull my configuration")
+		pullConfiguration(serviceURL, identity.ID, idToken)
+		log.Println("config pulled")
 	}
 
 }
@@ -89,5 +110,33 @@ func registerGateway(url string, body *Gateway, idToken string) {
 		log.Fatal(err2)
 	}
 
+	fmt.Println(responseObject)
+}
+
+func pullConfiguration(url string, id string, idToken string) {
+
+	req, err := http.NewRequest("GET", url+endpointBasePath+"/"+id+"/configuration", nil)
+	if err != nil {
+		return
+	}
+	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", idToken))
+	response, err := http.DefaultClient.Do(req)
+
+	if err != nil {
+		fmt.Print(err.Error())
+		os.Exit(1)
+	}
+
+	responseData, err := ioutil.ReadAll(response.Body)
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.Println("parsing response...", responseData)
+	var responseObject []Configuration
+	err = json.Unmarshal(responseData, &responseObject)
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.Println("response parsed")
 	fmt.Println(responseObject)
 }

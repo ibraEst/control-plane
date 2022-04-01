@@ -1,27 +1,26 @@
 package main
 
 import (
+	"flag"
 	"log"
-	"os"
-	"strconv"
 )
 
-const defaultPort = 10000
+var port int
+
+func init() {
+	flag.IntVar(&port, "port", 9090, "Server port")
+}
 
 func main() {
 
+	flag.Parse()
 	cp := NewControlPlane(NewGatewayService([]Gateway{}), NewConfigurationServiceImpl([]Configuration{}))
-	port, err := strconv.Atoi(os.Getenv("CONTROL_PLANE_PORT"))
-
-	if err != nil {
-		port = defaultPort
-	}
 	s := SetupHttpServer(port, cp)
-	err = s.ListenAndServe()
+	err := s.ListenAndServe()
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	log.Println("Control plane server started..")
+	log.Printf("Control plane server started and listening to port %d", port)
 
 }

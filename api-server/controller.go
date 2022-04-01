@@ -51,11 +51,14 @@ func (cp *ControlPlane) registerGateway(c *gin.Context) {
 
 	var gateway Gateway
 	if err := c.BindJSON(&gateway); err != nil {
+		log.Printf("error while parsing gateway :%v", gateway)
+		c.Status(http.StatusBadRequest)
 		return
 	}
 
 	err := cp.gatewayService.RegisterGateway(gateway)
 	if err != nil {
+		log.Println("error while registring gateway %v", gateway)
 		c.JSON(http.StatusBadRequest, gateway)
 		return
 	}
@@ -67,7 +70,7 @@ func (cp *ControlPlane) registerGateway(c *gin.Context) {
 }
 
 func (cp *ControlPlane) listGateways(c *gin.Context) {
-	fmt.Println("Endpoint Hit: listGateways")
+	log.Println("Endpoint Hit: listGateways")
 
 	result := cp.gatewayService.GetGateways()
 	fmt.Println(result)
@@ -75,7 +78,7 @@ func (cp *ControlPlane) listGateways(c *gin.Context) {
 }
 
 func (cp *ControlPlane) returnSingleGateway(c *gin.Context) {
-	fmt.Println("Endpoint Hit: returnSingleGateway")
+	log.Println("Endpoint Hit: returnSingleGateway")
 
 	key := c.Param("id")
 	result, err := cp.gatewayService.GetGatewayInfo(key)
@@ -88,8 +91,8 @@ func (cp *ControlPlane) returnSingleGateway(c *gin.Context) {
 
 }
 
-func (cp *ControlPlane) GetConfiguration(c *gin.Context) {
-	fmt.Println("Endpoint Hit: get configuration")
+func (cp *ControlPlane) GetConfigurationByInstanceId(c *gin.Context) {
+	log.Println("Endpoint Hit: get configuration")
 
 	id := c.Param("id")
 	result, err := cp.configurationService.GetConfiguration(id)
@@ -107,14 +110,14 @@ func SetupHttpServer(port int, controller *ControlPlane) *http.Server {
 	router.POST("/v1/gateways", controller.registerGateway)
 	router.GET("/v1/gateways", controller.listGateways)
 	router.GET("/v1/gateways/:id", controller.returnSingleGateway)
-	router.GET("/v1/gateways/:id/configuration", controller.GetConfiguration)
+	router.GET("/v1/gateways/:id/configurations", controller.GetConfigurationByInstanceId)
 
 	srv := &http.Server{
 		Addr:    fmt.Sprintf(":%d", port),
 		Handler: router,
 	}
 
-	log.Print("HTTP Server Listening on: ", port)
+	log.Println("HTTP Server Listening on: ", port)
 
 	return srv
 

@@ -1,4 +1,4 @@
-module api-client
+module control-plane/api-client
 
 go 1.17
 

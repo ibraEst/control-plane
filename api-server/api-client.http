@@ -1,0 +1,16 @@
+### Register a gateway instance/agent
+POST http://{{host}}:{{port}}/v1/gateways
+
+{"id": "999", "name": "gtw-1", "version":3, "region":"euw1"}
+
+### List registred gateways
+GET http://{{host}}:{{port}}/v1/gateways
+Accept: application/json
+
+### Get a gateway instance defined by instanceId
+GET http://{{host}}:{{port}}/v1/gateways/999
+
+### Get last configuration by gateway's instance Id
+GET http://{{host}}:{{port}}/v1/gateways/999/configurations
+
+
