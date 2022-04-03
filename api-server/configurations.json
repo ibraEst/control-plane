@@ -1,0 +1,34 @@
+{
+  "1": [
+    {
+      "Direction": "spokeToHub",
+      "ServiceId": "s1",
+      "Ports": [
+        8080
+      ],
+      "vip": "10.10.10.10",
+      "ip": "2.2.2.2"
+    }
+  ],
+  "2": [
+    {
+      "Direction": "spokeToHub",
+      "ServiceId": "s2",
+      "Ports": [
+        8081
+      ],
+      "vip": "10.10.10.11",
+      "ip": "2.2.2.3"
+    },
+    {
+      "Direction": "HubToSpoke",
+      "ServiceId": "s3",
+      "Ports": [
+        8082,
+        9090
+      ],
+      "vip": "10.10.13.13",
+      "ip": "2.2.4.4"
+    }
+  ]
+}

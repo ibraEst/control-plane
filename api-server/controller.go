@@ -44,6 +44,7 @@ type GatewayService interface {
 // ConfigurationService is an interface for configuration management.
 type ConfigurationService interface {
 	GetConfiguration(id string) ([]Configuration, error)
+	GetConfigurations() map[string][]Configuration
 }
 
 func (cp *ControlPlane) registerGateway(c *gin.Context) {
@@ -58,7 +59,7 @@ func (cp *ControlPlane) registerGateway(c *gin.Context) {
 
 	err := cp.gatewayService.RegisterGateway(gateway)
 	if err != nil {
-		log.Println("error while registring gateway %v", gateway)
+		log.Println("error while registring gateway ", gateway)
 		c.JSON(http.StatusBadRequest, gateway)
 		return
 	}
@@ -94,13 +95,22 @@ func (cp *ControlPlane) returnSingleGateway(c *gin.Context) {
 func (cp *ControlPlane) GetConfigurationByInstanceId(c *gin.Context) {
 	log.Println("Endpoint Hit: get configuration")
 
+	//read request
 	id := c.Param("id")
+
+	//handle request
 	result, err := cp.configurationService.GetConfiguration(id)
 	if err != nil {
+		log.Printf("service handling  error, %v", err)
 		c.Status(http.StatusInternalServerError)
+		return
 	} else {
 		c.JSON(http.StatusOK, result)
 	}
+}
+
+func (cp *ControlPlane) GetConfigurations(c *gin.Context) {
+	c.JSON(http.StatusOK, cp.configurationService.GetConfigurations())
 }
 
 func SetupHttpServer(port int, controller *ControlPlane) *http.Server {
@@ -111,6 +121,7 @@ func SetupHttpServer(port int, controller *ControlPlane) *http.Server {
 	router.GET("/v1/gateways", controller.listGateways)
 	router.GET("/v1/gateways/:id", controller.returnSingleGateway)
 	router.GET("/v1/gateways/:id/configurations", controller.GetConfigurationByInstanceId)
+	router.GET("/v1/gateways/configurations", controller.GetConfigurations)
 
 	srv := &http.Server{
 		Addr:    fmt.Sprintf(":%d", port),

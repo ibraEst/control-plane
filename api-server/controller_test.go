@@ -46,11 +46,15 @@ type MockConfigService struct {
 	configurations map[string][]Configuration
 }
 
+func (s *MockConfigService) GetConfigurations() map[string][]Configuration {
+	return s.configurations
+}
+
 func (s *MockConfigService) GetConfiguration(id string) ([]Configuration, error) {
 	v, found := s.configurations[id]
 
 	if !found {
-		return nil, errors.New("Gateway with id " + id + " not registered")
+		return nil, errors.New("No configuration found for gateway id " + id)
 	}
 
 	return v, nil
@@ -211,12 +215,11 @@ func TestGETConfiguration(t *testing.T) {
 		s := SetupHttpServer(port, server)
 
 		//when pull config
-		req, _ := http.NewRequest(http.MethodGet, "/v1/gateways/1/configuration", nil)
+		req, _ := http.NewRequest(http.MethodGet, "/v1/gateways/1/configurations", nil)
 		resp := httptest.NewRecorder()
 		s.Handler.ServeHTTP(resp, req)
 
-		//then receive one config
-
+		//then assert response
 		assertStatus(t, resp.Code, http.StatusOK)
 		actual := getConfigurationFromResponse(t, resp.Body)
 		assertConfigResponse(t, actual, expected)
@@ -233,51 +236,15 @@ func TestGETConfiguration(t *testing.T) {
 		s := SetupHttpServer(port, server)
 
 		//when pull config
-		req, _ := http.NewRequest(http.MethodGet, "/v1/gateways/UNKNOWN/configuration", nil)
+		req, _ := http.NewRequest(http.MethodGet, "/v1/gateways/UNKNOWN/configurations", nil)
 		resp := httptest.NewRecorder()
 		s.Handler.ServeHTTP(resp, req)
 
-		//then receive one config
-
+		//then
 		assertStatus(t, resp.Code, http.StatusInternalServerError)
 
 	})
-	/*	t.Run("returns 400 bad request if is not valid request JSON", func(t *testing.T) {
-			//given
-			name := "1"
-			req, _ := http.NewRequest(http.MethodGet, fmt.Sprintf("/v1/gateways/%s", name), nil)
 
-			resp := httptest.NewRecorder()
-			//when
-
-			r.ServeHTTP(resp, req)
-			//then
-			assertStatus(t, resp.Code, http.StatusOK)
-
-			actual := getOneGatewayFromResponse(t, resp.Body)
-
-			assertGateway(t, actual, want[0])
-		}
-
-
-
-
-		t.Run("returns 500 internal server error if no configuration found for the gateway id", func(t *testing.T) {
-			//given
-			name := "1"
-			req, _ := http.NewRequest(http.MethodGet, fmt.Sprintf("/v1/gateways/%s", name), nil)
-
-			resp := httptest.NewRecorder()
-			//when
-
-			r.ServeHTTP(resp, req)
-			//then
-			assertStatus(t, resp.Code, http.StatusOK)
-
-			actual := getOneGatewayFromResponse(t, resp.Body)
-
-			assertGateway(t, actual, want[0])
-		}*/
 }
 func assertStatus(t *testing.T, actual, expected int) {
 	t.Helper()

@@ -11,6 +11,10 @@ Accept: application/json
 GET http://{{host}}:{{port}}/v1/gateways/999
 
 ### Get last configuration by gateway's instance Id
-GET http://{{host}}:{{port}}/v1/gateways/999/configurations
+GET http://{{host}}:{{port}}/v1/gateways/1/configurations
+
+### Get all configurations
+GET http://{{host}}:{{port}}/v1/gateways/configurations
+
 
 

@@ -1,15 +1,27 @@
 package main
 
+import (
+	"errors"
+)
+
 // GatewayServiceImpl collects data about gateways in memory.
 type ConfigurationServiceImpl struct {
-	list []Configuration
+	configStore map[string][]Configuration
+}
+
+func NewConfigurationServiceImpl(configStore map[string][]Configuration) *ConfigurationServiceImpl {
+	return &ConfigurationServiceImpl{configStore: configStore}
 }
 
 func (c ConfigurationServiceImpl) GetConfiguration(id string) ([]Configuration, error) {
-	//TODO implement me
-	panic("implement me")
+	v, found := c.configStore[id]
+
+	if !found {
+		return nil, errors.New("No configuration found for gateway id " + id)
+	}
+	return v, nil
 }
 
-func NewConfigurationServiceImpl(list []Configuration) *ConfigurationServiceImpl {
-	return &ConfigurationServiceImpl{list: list}
+func (c ConfigurationServiceImpl) GetConfigurations() map[string][]Configuration {
+	return c.configStore
 }
